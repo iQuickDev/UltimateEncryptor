@@ -6,6 +6,7 @@ using System.IO;
 using System.Text;
 using System.Security.Cryptography;
 using System.Linq;
+using System.Threading;
 
 namespace UltimateEncryptor
 {
@@ -63,106 +64,135 @@ namespace UltimateEncryptor
 
         private void FileEncrypt(string encryptFile, string encryptKeyString)
         {
-
-            byte[] salt = GenerateRandomSalt();
-
-            FileStream fsCrypt = new FileStream(encryptFile, FileMode.Create);
-
-            byte[] passwordBytes = Encoding.UTF8.GetBytes(encryptKeyString);
-
-            RijndaelManaged AES = new RijndaelManaged();
-            AES.KeySize = 256;
-            AES.BlockSize = 128;
-            AES.Padding = PaddingMode.PKCS7;
-
-            var key = new Rfc2898DeriveBytes(passwordBytes, salt, 50000);
-            AES.Key = key.GetBytes(AES.KeySize / 8);
-            AES.IV = key.GetBytes(AES.BlockSize / 8);
-
-            AES.Mode = CipherMode.CFB;
-
-            fsCrypt.Write(salt, 0, salt.Length);
-
-            CryptoStream cs = new CryptoStream(fsCrypt, AES.CreateEncryptor(), CryptoStreamMode.Write);
-            FileStream fsIn = new FileStream(encryptFileWPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
-
-            byte[] buffer = new byte[1048576];
-            int read;
-
-            try
+            new Thread(() =>
             {
-                while ((read = fsIn.Read(buffer, 0, buffer.Length)) > 0)
+                operationprogress.Value = 20;
+
+                byte[] salt = GenerateRandomSalt();
+
+                FileStream fsCrypt = new FileStream(encryptFile, FileMode.Create);
+
+                byte[] passwordBytes = Encoding.UTF8.GetBytes(encryptKeyString);
+
+                operationprogress.Value = 30;
+
+                RijndaelManaged AES = new RijndaelManaged();
+                AES.KeySize = 256;
+                AES.BlockSize = 128;
+                AES.Padding = PaddingMode.PKCS7;
+
+                var key = new Rfc2898DeriveBytes(passwordBytes, salt, 50000);
+                AES.Key = key.GetBytes(AES.KeySize / 8);
+                AES.IV = key.GetBytes(AES.BlockSize / 8);
+
+                AES.Mode = CipherMode.CFB;
+
+                operationprogress.Value = 50;
+
+                fsCrypt.Write(salt, 0, salt.Length);
+
+                CryptoStream cs = new CryptoStream(fsCrypt, AES.CreateEncryptor(), CryptoStreamMode.Write);
+                FileStream fsIn = new FileStream(encryptFileWPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+
+                operationprogress.Value = 70;
+
+                byte[] buffer = new byte[1048576];
+                int read;
+
+                try
                 {
-                    Application.DoEvents();
-                    cs.Write(buffer, 0, read);
+                    while ((read = fsIn.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        Application.DoEvents();
+                        cs.Write(buffer, 0, read);
+                    }
+
+                    fsIn.Close();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error: " + ex.Message);
+                }
+                finally
+                {
+                    cs.Close();
+                    fsCrypt.Close();
                 }
 
-                fsIn.Close();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error: " + ex.Message);
-            }
-            finally
-            {
-                cs.Close();
-                fsCrypt.Close();
-            }
+                operationprogress.Value = 100;
+
+            }).Start();
         }
 
         private void FileDecrypt(string encryptFile, string decryptFile, string decryptKeyString)
         {
-            byte[] passwordBytes = System.Text.Encoding.UTF8.GetBytes(decryptKeyString);
-            byte[] salt = new byte[32];
-
-            FileStream fsCrypt = new FileStream(decryptFileWPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            fsCrypt.Read(salt, 0, salt.Length);
-            RijndaelManaged AES = new RijndaelManaged();
-            AES.KeySize = 256;
-            AES.BlockSize = 128;
-            var key = new Rfc2898DeriveBytes(passwordBytes, salt, 50000);
-            AES.Key = key.GetBytes(AES.KeySize / 8);
-            AES.IV = key.GetBytes(AES.BlockSize / 8);
-            AES.Padding = PaddingMode.PKCS7;
-            AES.Mode = CipherMode.CFB;
-
-            CryptoStream cs = new CryptoStream(fsCrypt, AES.CreateDecryptor(), CryptoStreamMode.Read);
-
-            FileStream fsOut = new FileStream(decryptFileWPath, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
-
-            int read;
-            byte[] buffer = new byte[1048576];
-
-            try
+            new Thread(() =>
             {
-                while ((read = cs.Read(buffer, 0, buffer.Length)) > 0)
+                operationprogress.Value = 20;
+
+                byte[] passwordBytes = Encoding.UTF8.GetBytes(decryptKeyString);
+                byte[] salt = new byte[32];
+
+                operationprogress.Value = 30;
+
+                FileStream fsCrypt = new FileStream(decryptFileWPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                fsCrypt.Read(salt, 0, salt.Length);
+                RijndaelManaged AES = new RijndaelManaged();
+                AES.KeySize = 256;
+                AES.BlockSize = 128;
+                var key = new Rfc2898DeriveBytes(passwordBytes, salt, 50000);
+                AES.Key = key.GetBytes(AES.KeySize / 8);
+                AES.IV = key.GetBytes(AES.BlockSize / 8);
+                AES.Padding = PaddingMode.PKCS7;
+                AES.Mode = CipherMode.CFB;
+
+                operationprogress.Value = 50;
+
+                CryptoStream cs = new CryptoStream(fsCrypt, AES.CreateDecryptor(), CryptoStreamMode.Read);
+
+                FileStream fsOut = new FileStream(decryptFileWPath, FileMode.Create, FileAccess.ReadWrite, FileShare.ReadWrite);
+
+                operationprogress.Value = 80;
+
+                int read;
+                byte[] buffer = new byte[1048576];
+
+                try
                 {
-                    Application.DoEvents();
-                    fsOut.Write(buffer, 0, read);
+                    while ((read = cs.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        Application.DoEvents();
+                        fsOut.Write(buffer, 0, read);
+                    }
                 }
-            }
-            catch (CryptographicException ex_CryptographicException)
-            {
-                Console.WriteLine("CryptographicException error: " + ex_CryptographicException.Message);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error: " + ex.Message);
-            }
+                catch (CryptographicException ex_CryptographicException)
+                {
+                    Console.WriteLine("CryptographicException error: " + ex_CryptographicException.Message);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error: " + ex.Message);
+                }
 
-            try
-            {
-                cs.Close();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error by closing CryptoStream: " + ex.Message);
-            }
-            finally
-            {
-                fsOut.Close();
-                fsCrypt.Close();
-            }
+                operationprogress.Value = 90;
+
+                try
+                {
+                    cs.Close();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Error by closing CryptoStream: " + ex.Message);
+                }
+                finally
+                {
+                    fsOut.Close();
+                    fsCrypt.Close();
+                }
+
+                operationprogress.Value = 100;
+
+            }).Start();
         }
 
 
